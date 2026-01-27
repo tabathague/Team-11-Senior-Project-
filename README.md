@@ -1,4 +1,5 @@
 **Feeding Rate Detection System Using Neural Networks**
+
 Overview
 
 This project implements an automated feeding rate detection system using a camera and a neural network–based digit recognition model. Instead of relying solely on Optical Character Recognition (OCR), the system captures images, preprocesses them, and uses a trained neural network to accurately identify numerical feeding rate values displayed on a device.
