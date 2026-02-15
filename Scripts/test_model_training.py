@@ -1,6 +1,20 @@
 # ==============================
 # DIGIT MODEL TRAINING SCRIPT
 # ==============================
+''' For training data set, directory should be strucutured as follows
+Data/
+    digit_images/
+        >0
+        >1
+        >2
+        >3
+        >4
+        >5
+        >6
+        >7
+        >8
+        >9
+Where each digit folder contains images of corresponding digit'''
 
 import os
 import numpy as np
