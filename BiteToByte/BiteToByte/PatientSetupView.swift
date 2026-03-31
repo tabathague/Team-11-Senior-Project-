@@ -2,8 +2,8 @@ import SwiftUI
 import CoreData
 
 struct PatientSetupView: View {
-    let patientName: String = "Jane Doe"
-    let patientID: String = "A123456"
+    let patientName: String
+    let patientID: String
 
     @State private var clipType: ClipType? = nil
     @State private var feedType: FeedType? = nil
