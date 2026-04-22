@@ -7,6 +7,7 @@
 import SwiftUI
 import CoreData
 import UIKit
+import AVFoundation
 
 struct Patient: Identifiable {
     let id: String
@@ -32,9 +33,6 @@ func parsePatient(from barcode: String) -> Patient {
 
     return Patient(id: id, name: name)
 }
-
-import SwiftUI
-import AVFoundation
 
 struct BarcodeScannerView: UIViewControllerRepresentable {
     var onScan: (String) -> Void
@@ -81,30 +79,32 @@ final class ScannerVC: UIViewController, AVCaptureMetadataOutputObjectsDelegate 
         didOutput metadataObjects: [AVMetadataObject],
         from connection: AVCaptureConnection
     ) {
+        print("Objects detected:", metadataObjects.count)
+        
         guard let object = metadataObjects.first as? AVMetadataMachineReadableCodeObject,
               let code = object.stringValue else { return }
 
+        print("SCANNED:", code)
+        
         session.stopRunning()
         onScan?(code)
     }
 }
 
-import SwiftUI
-
 struct BarcodeScan: View {
     @State private var showScanner = false
-    @State private var scannedPatient: Patient?
+    @State private var scannedPatient: Patient? = nil
 
     var body: some View {
         NavigationView {
             VStack(spacing: 30) {
 
                 // Auto-navigate when a patient is scanned
-                if let p = scannedPatient {
+                if let patient = scannedPatient {
                     NavigationLink(
                         destination: PatientSetupView(
-                            patientName: p.name,
-                            patientID: p.id
+                            patientName: patient.name,
+                            patientID: patient.id
                         ),
                         isActive: .constant(true)
                     ) {
@@ -113,6 +113,8 @@ struct BarcodeScan: View {
                 }
 
                 Button("Scan Patient Barcode") {
+                    // Reset previous scan
+                    scannedPatient = nil
                     showScanner = true
                 }
                 .font(.title2)
@@ -120,7 +122,17 @@ struct BarcodeScan: View {
             .navigationTitle("Patient Intake")
             .sheet(isPresented: $showScanner) {
                 BarcodeScannerView { barcode in
-                    self.scannedPatient = parsePatient(from: barcode)
+                    // 1. Parse the string into a Patient object
+                    let patient = parsePatient(from: barcode)
+                    
+                    // 2. Update the state so the NavigationLink triggers
+                    self.scannedPatient = patient
+                    
+                    // 3. Close the scanner
+                    self.showScanner = false
+                    
+                    // 4. (Optional) Print to console for verification
+                    print("Successfully scanned ID: \(patient.id)")
                 }
             }
         }

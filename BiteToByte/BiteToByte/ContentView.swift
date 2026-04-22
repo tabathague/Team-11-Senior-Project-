@@ -9,7 +9,7 @@ import CoreData
 
 // Entity: DayLog
 // Attributes:
-// - id: UUID
+// - id: String
 // - date: Date (start of day)
 // - createdAt: Date
 // Relationship:
@@ -17,7 +17,7 @@ import CoreData
 
 // Entity: EntryLog
 // Attributes:
-// - id: UUID
+// - id: String
 // - time: Date
 // - volume: Double
 // Relationship:
@@ -64,7 +64,8 @@ class FeedingDataManager {
         }
 
         let newDay = DayLog(context: context)
-        newDay.id = UUID()
+        newDay.id = String()
+        newDay.name = String()
         newDay.date = day
         newDay.createdAt = Date()
         save()
@@ -76,7 +77,8 @@ class FeedingDataManager {
         let dayLog = getOrCreateDayLog(for: time)
 
         let entry = EntryLog(context: context)
-        entry.id = UUID()
+        entry.id = String()
+        entry.name = String()
         entry.time = time
         entry.volume = volume
         entry.day = dayLog
@@ -108,7 +110,8 @@ class FeedingDataManager {
         let days = (0..<3).compactMap { offset -> DayLog in
             let date = Calendar.current.date(byAdding: .day, value: -offset, to: Date())!.startOfDay()
             let day = DayLog(context: context)
-            day.id = UUID()
+            day.id = String()
+            day.name = String()
             day.date = date
             day.createdAt = Date()
             return day
@@ -118,7 +121,8 @@ class FeedingDataManager {
         for day in days {
             for i in 0..<4 {
                 let entry = EntryLog(context: context)
-                entry.id = UUID()
+                entry.id = String()
+                entry.name = String()
                 entry.time = Calendar.current.date(byAdding: .hour, value: i * 3, to: day.date ?? Date())
                 entry.volume = Double.random(in: 20...120)
                 entry.day = day
@@ -184,68 +188,136 @@ private enum Formatters {
 
 // MARK: - SwiftUI Views
 
+//struct DailyTableView: View {
+//    @FetchRequest(
+//        sortDescriptors: [SortDescriptor(\DayLog.date, order: .reverse)]
+//    ) var days: FetchedResults<DayLog>
+//
+//    let manager = FeedingDataManager()
+//
+//    var body: some View {
+//        NavigationView {
+//            List {
+//                ForEach(days, id: \.objectID) { (day: DayLog) in
+//                    NavigationLink(destination: EntryTableView(dayLog: day)) {
+//                        Text(Formatters.day.string(from: day.date ?? Date()))
+//                    }
+//                }
+//            }
+//            .navigationTitle("Daily Logs")
+//            .onAppear {
+//                manager.deleteExpiredTables() // enforce 30-day rule
+//                manager.seedIfNeeded()
+//            }
+//        }
+//    }
+//}
+
 struct DailyTableView: View {
-    @FetchRequest(
-        sortDescriptors: [SortDescriptor(\DayLog.date, order: .reverse)]
-    ) var days: FetchedResults<DayLog>
+    let id: String // Pass this in from the SetupView
+    
+    @FetchRequest var days: FetchedResults<DayLog>
 
-    let manager = FeedingDataManager()
+    init(id: String) {
+        self.id = id
+        // This filters the list to ONLY show days belonging to this patient
+        self._days = FetchRequest(
+            sortDescriptors: [SortDescriptor(\.date, order: .reverse)],
+            predicate: NSPredicate(format: "id == %@", id)
+        )
+    }
 
     var body: some View {
-        NavigationView {
-            List {
-                ForEach(days, id: \.objectID) { (day: DayLog) in
-                    NavigationLink(destination: EntryTableView(dayLog: day)) {
+        List {
+            ForEach(days) { day in
+                NavigationLink(destination: EntryTableView(dayLog: day)) {
+                    VStack(alignment: .leading) {
                         Text(Formatters.day.string(from: day.date ?? Date()))
+                            .font(.headline)
+                        Text("ID: \(day.id ?? "Unknown")")
+                            .font(.caption)
                     }
                 }
             }
-            .navigationTitle("Daily Logs")
-            .onAppear {
-                manager.deleteExpiredTables() // enforce 30-day rule
-                manager.seedIfNeeded()
-            }
         }
+        .navigationTitle("Logs for \(id)")
     }
 }
 
+//struct EntryTableView: View {
+//    let dayLog: DayLog
+//    let manager = FeedingDataManager()
+//    @State private var exportURL: URL? = nil
+//    @State private var showShareSheet = false
+//    var body: some View {
+//        VStack {
+//            List {
+//                let entriesSet = (dayLog.entries as? Set<EntryLog>) ?? []
+//                let entries = entriesSet.sorted { (lhs, rhs) in (lhs.time ?? .distantPast) < (rhs.time ?? .distantPast) }
+//
+//                ForEach(entries, id: \.id) { (e: EntryLog) in
+//                    HStack {
+//                        Text(Formatters.time.string(from: e.time ?? .distantPast))
+//                        Spacer()
+//                        Text(String(format: "%.2f mL", e.volume))
+//                    }
+//                }
+//            }
+//
+//            Button("Export CSV") {
+//                if let url = manager.exportDayToCSV(dayLog: dayLog) {
+//                    exportURL = url
+//                    showShareSheet = true
+//                }
+//            }
+//            .padding()
+//            .sheet(isPresented: $showShareSheet) {
+//                if let url = exportURL {
+//                    ShareSheet(activityItems: [url])
+//                }
+//            }
+//        }
+//        .navigationTitle("Entries")
+//    }
+//}
 struct EntryTableView: View {
-    let dayLog: DayLog
-    let manager = FeedingDataManager()
-    @State private var exportURL: URL? = nil
-    @State private var showShareSheet = false
+    let dayLog: DayLog // This is passed from the DailyTableView
+
+    // Fetch only the entries that belong to THIS specific dayLog
+    @FetchRequest var entries: FetchedResults<EntryLog>
+
+    init(dayLog: DayLog) {
+        self.dayLog = dayLog
+        // Filter: Only show entries where 'day' matches the day we tapped
+        self._entries = FetchRequest(
+            sortDescriptors: [SortDescriptor(\.time, order: .forward)],
+            predicate: NSPredicate(format: "day == %@", dayLog)
+        )
+    }
+
     var body: some View {
-        VStack {
-            List {
-                let entriesSet = (dayLog.entries as? Set<EntryLog>) ?? []
-                let entries = entriesSet.sorted { (lhs, rhs) in (lhs.time ?? .distantPast) < (rhs.time ?? .distantPast) }
-
-                ForEach(entries, id: \.id) { (e: EntryLog) in
-                    HStack {
-                        Text(Formatters.time.string(from: e.time ?? .distantPast))
-                        Spacer()
-                        Text(String(format: "%.2f mL", e.volume))
-                    }
-                }
+        List {
+            // Header Row
+            HStack {
+                Text("Time").bold()
+                Spacer()
+                Text("Volume (mL)").bold()
             }
+            .padding(.vertical, 5)
 
-            Button("Export CSV") {
-                if let url = manager.exportDayToCSV(dayLog: dayLog) {
-                    exportURL = url
-                    showShareSheet = true
-                }
-            }
-            .padding()
-            .sheet(isPresented: $showShareSheet) {
-                if let url = exportURL {
-                    ShareSheet(activityItems: [url])
+            // Data Rows from your CSV
+            ForEach(entries) { entry in
+                HStack {
+                    Text(entry.time ?? Date(), style: .time)
+                    Spacer()
+                    // Formatting the volume to 2 decimal places
+                    Text(String(format: "%.2f", entry.volume))
                 }
             }
         }
-        .navigationTitle("Entries")
+        .navigationTitle(Formatters.day.string(from: dayLog.date ?? Date()))
     }
 }
-
 // MARK: - App Entry
 struct ShareSheet: UIViewControllerRepresentable {
     let activityItems: [Any]
@@ -258,7 +330,7 @@ struct ShareSheet: UIViewControllerRepresentable {
 }
 
 #Preview {
-    DailyTableView()
+    DailyTableView(id:"000000")
         .environment(\.managedObjectContext, PersistenceController.shared.container.viewContext)
 }
 

@@ -125,8 +125,20 @@ struct PatientSetupView: View {
                 // Start Recording Button -> navigates to DailyTableView
                 Button {
                     if isConfirmed && feedType != nil {
-                        navigateToApp = true
-                    }
+                            savePatient(
+                                name: patientName,
+                                id: patientID,
+                                context: PersistenceController.shared.container.viewContext
+                            )
+                        
+                        importCSVIntoCoreData(
+                                    context: PersistenceController.shared.container.viewContext,
+                                    id: patientID,
+                                    name: patientName
+                                )
+
+                            navigateToApp = true
+                        }
                 } label: {
                     Text("Start Recording")
                         .frame(maxWidth: .infinity)
@@ -137,7 +149,7 @@ struct PatientSetupView: View {
                 }
                 .disabled(!isConfirmed || feedType == nil)
                 .navigationDestination(isPresented: $navigateToApp) {
-                    DailyTableView()
+                    DailyTableView(id: patientID)
                         .environment(\.managedObjectContext, PersistenceController.shared.container.viewContext)
                 }
             }
@@ -147,6 +159,20 @@ struct PatientSetupView: View {
     }
 }
 
+func savePatient(name: String, id: String, context: NSManagedObjectContext) {
+    let patient = PatientProfile(context: context)
+    patient.id = id
+    patient.name = name
+    patient.createdAt = Date()
+    
+do {
+    try context.save()
+    print("Patient saved")
+    } catch {
+        print("Error saving patient:", error)
+    }
+}
+
 #Preview {
-    PatientSetupView()
+    PatientSetupView(patientName: "Test", patientID: "000000")
 }
