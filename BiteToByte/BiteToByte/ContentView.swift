@@ -213,34 +213,62 @@ private enum Formatters {
 //    }
 //}
 
+//struct DailyTableView: View {
+//    let id: String // Pass this in from the SetupView
+//    
+//    @FetchRequest var days: FetchedResults<DayLog>
+//
+//    init(id: String) {
+//        self.id = id
+//        // This filters the list to ONLY show days belonging to this patient
+//        self._days = FetchRequest(
+//            sortDescriptors: [SortDescriptor(\.date, order: .reverse)],
+//            predicate: NSPredicate(format: "id == %@", id)
+//        )
+//    }
+//
+//    var body: some View {
+//        List {
+//            ForEach(days) { day in
+//                NavigationLink(destination: EntryTableView(dayLog: day)) {
+//                    VStack(alignment: .leading) {
+//                        Text(Formatters.day.string(from: day.date ?? Date()))
+//                            .font(.headline)
+//                        Text("ID: \(day.id ?? "Unknown")")
+//                            .font(.caption)
+//                    }
+//                }
+//            }
+//        }
+//        .navigationTitle("Logs for \(id)")
+//    }
+//}
+
 struct DailyTableView: View {
-    let id: String // Pass this in from the SetupView
+    let patientID: String // Pass this in from the scanner
     
     @FetchRequest var days: FetchedResults<DayLog>
 
     init(id: String) {
-        self.id = id
-        // This filters the list to ONLY show days belonging to this patient
+        let cleanID = id.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        self.patientID = cleanID
+        
+        // This is the CRITICAL part: it filters the database
+        // to ONLY show logs matching this specific barcode
         self._days = FetchRequest(
             sortDescriptors: [SortDescriptor(\.date, order: .reverse)],
-            predicate: NSPredicate(format: "id == %@", id)
+            predicate: NSPredicate(format: "id == %@", cleanID)
         )
     }
-
+    
     var body: some View {
-        List {
-            ForEach(days) { day in
-                NavigationLink(destination: EntryTableView(dayLog: day)) {
-                    VStack(alignment: .leading) {
-                        Text(Formatters.day.string(from: day.date ?? Date()))
-                            .font(.headline)
-                        Text("ID: \(day.id ?? "Unknown")")
-                            .font(.caption)
-                    }
-                }
+        List(days) { day in
+            // Only this patient's days will appear here
+            NavigationLink(destination: EntryTableView(dayLog: day)) {
+                Text(day.date ?? Date(), style: .date)
             }
         }
-        .navigationTitle("Logs for \(id)")
     }
 }
 
@@ -330,7 +358,7 @@ struct ShareSheet: UIViewControllerRepresentable {
 }
 
 #Preview {
-    DailyTableView(id:"000000")
+    DailyTableView(id:"")
         .environment(\.managedObjectContext, PersistenceController.shared.container.viewContext)
 }
 

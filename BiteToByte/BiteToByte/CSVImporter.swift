@@ -211,7 +211,7 @@ func saveRows(_ rows: [CSVRow], context: NSManagedObjectContext, patientID: Stri
         }
         
         let entry = EntryLog(context: context)
-        entry.id = UUID().uuidString
+        entry.id = patientID
         entry.name = patientName
         entry.time = current.timestamp
         entry.volume = cumulativeVolume
@@ -236,20 +236,62 @@ func saveRows(_ rows: [CSVRow], context: NSManagedObjectContext, patientID: Stri
 //    saveRows(rows, context: context)
 //}
 // MARK: - Main Import Function (Update this one!)
+//func importCSVIntoCoreData(context: NSManagedObjectContext, id: String, name: String) {
+//    
+//    guard let csvString = loadCSV(named: "feeding_rates") else {
+//        print("Failed to load CSV string")
+//        return
+//    }
+//    
+//    let rows = parseCSV(csvString)
+//    
+//    guard !rows.isEmpty else {
+//        print("No valid data parsed from CSV")
+//        return
+//    }
+//    
+//    // Pass the id and name through to the save function
+//    saveRows(rows, context: context, patientID: id, patientName: name)
+//}
 func importCSVIntoCoreData(context: NSManagedObjectContext, id: String, name: String) {
+    let cleanID = id.trimmingCharacters(in: .whitespacesAndNewlines)
+    // 1. Dynamic Search: Look for a file named "feeding_rates_000000.csv"
+    let fileName = "feeding_rates_\(cleanID)"
+    print("DEBUG: Searching for exactly: '\(fileName)' with no extension")
     
-    guard let csvString = loadCSV(named: "feeding_rates") else {
-        print("Failed to load CSV string")
+    // This will list EVERY file the app can actually see
+    let docsPath = Bundle.main.resourcePath!
+    let fileList = try? FileManager.default.contentsOfDirectory(atPath: docsPath)
+    print("DEBUG: Files actually inside the app: \(fileList ?? [])")
+    
+    guard let filepath = Bundle.main.path(forResource: fileName, ofType: "csv") else {
+        print("No specific CSV found for Patient \(id). Starting with an empty log.")
         return
     }
     
-    let rows = parseCSV(csvString)
-    
-    guard !rows.isEmpty else {
-        print("No valid data parsed from CSV")
-        return
+    do {
+        let contents = try String(contentsOfFile: filepath)
+        let parsedRows = parseCSV(contents)
+        
+            print("--- CSV DEBUG ---")
+            print("Raw string length: \(contents.count)")
+            print("Number of rows parsed: \(parsedRows.count)")
+            if let first = parsedRows.first {
+                print("First Row Sample: Time: \(first.timestamp), Rate: \(first.flowRate)")
+            }
+        
+        if parsedRows.isEmpty {
+            print("CSV for \(id) was empty.")
+            return
+        }
+        
+        // 2. Save the rows to the database under this specific ID
+        saveRows(parsedRows, context: context, patientID: id, patientName: name)
+        
+        print("Successfully imported specific data for Patient: \(id)")
+        
+    } catch {
+        print("File error for Patient \(id): \(error)")
     }
     
-    // Pass the id and name through to the save function
-    saveRows(rows, context: context, patientID: id, patientName: name)
 }

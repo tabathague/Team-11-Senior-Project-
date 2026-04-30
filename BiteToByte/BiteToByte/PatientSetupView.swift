@@ -124,20 +124,50 @@ struct PatientSetupView: View {
 
                 // Start Recording Button -> navigates to DailyTableView
                 Button {
+                    print("DEBUG: Start Recording clicked. Current ID is: '\(patientID)'")
                     if isConfirmed && feedType != nil {
-                            savePatient(
-                                name: patientName,
-                                id: patientID,
-                                context: PersistenceController.shared.container.viewContext
-                            )
-                        
-                        importCSVIntoCoreData(
-                                    context: PersistenceController.shared.container.viewContext,
-                                    id: patientID,
-                                    name: patientName
-                                )
+                            let context = PersistenceController.shared.container.viewContext
+                            
+                            // 1. Check if patient already exists
+                            let request: NSFetchRequest<PatientProfile> = PatientProfile.fetchRequest()
+                            request.predicate = NSPredicate(format: "id == %@", patientID)
+                            
+                            do {
+                                let results = try context.fetch(request)
+                                
+                                if results.isEmpty {
+                                    // CASE: NEW PATIENT
+                                    // Save profile and import their specific CSV (e.g., 230973.csv)
+                                    savePatient(name: patientName, id: patientID, context: context)
+                                    //importCSVIntoCoreData(context: context, id: patientID, name: patientName)
+                                    let cleanID = patientID.trimmingCharacters(in: .whitespacesAndNewlines)
 
-                            navigateToApp = true
+                                    importCSVIntoCoreData(
+                                        context: context,
+                                        id: cleanID,
+                                        name: patientName
+                                    )
+                                    print("New patient created and CSV imported.")
+                                } else {
+                                    // CASE: EXISTING PATIENT
+                                    // Do nothing here—Core Data already has their data
+                                    print("Existing patient found. Loading history.")
+                                    //importCSVIntoCoreData(context: context, id: patientID, name: patientName)
+                                    let cleanID = patientID.trimmingCharacters(in: .whitespacesAndNewlines)
+
+                                    importCSVIntoCoreData(
+                                        context: context,
+                                        id: cleanID,
+                                        name: patientName
+                                    )
+                                }
+                                
+                                // 2. Trigger Navigation
+                                navigateToApp = true
+                                
+                            } catch {
+                                print("Error checking for patient: \(error)")
+                            }
                         }
                 } label: {
                     Text("Start Recording")
@@ -174,5 +204,5 @@ do {
 }
 
 #Preview {
-    PatientSetupView(patientName: "Test", patientID: "000000")
+    PatientSetupView(patientName: "", patientID: "")
 }
